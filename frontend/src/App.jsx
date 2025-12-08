@@ -1,3 +1,5 @@
+// Copyright (c) 2025 Veekshith Gullapudi. All rights reserved.
+
 import { useState } from 'react';
 import './App.css';
 import { validateUrl, uploadResume, generateResume, getDownloadUrl } from './api';
@@ -14,6 +16,10 @@ function App() {
   const [apiKey, setApiKey] = useState(''); // New state for API Key
   const [previewUrl, setPreviewUrl] = useState(''); // New state for Preview URL
 
+  /**
+   * Handles the Job URL submission.
+   * Validates the URL via API and transitions state based on result.
+   */
   const handleUrlSubmit = async () => {
     if (!url) return;
     setIsLoading(true);
@@ -27,6 +33,7 @@ function App() {
       setStatus('valid');
       setMessage(result.message);
       setJobId(result.data.job_id);
+      // Wait briefly before prompting for resume upload
       setTimeout(() => {
         setMessage("The Process has analyzed the Job Description, Upload a Resume to generate a new resume");
       }, 1500);
@@ -36,6 +43,10 @@ function App() {
     }
   };
 
+  /**
+   * Handles the Resume file upload.
+   * Uploads file to backend and stores the returned resume ID.
+   */
   const handleFileUpload = async (event) => {
     const file = event.target.files[0];
     if (!file) return;
@@ -55,6 +66,11 @@ function App() {
     }
   };
 
+  /**
+   * Triggers the resume generation process.
+   * Sends Job ID, Resume ID, and API Key to backend.
+   * Updates state with download link and preview content.
+   */
   const handleGenerate = async () => {
     if (!jobId || !resumeId) return;
 

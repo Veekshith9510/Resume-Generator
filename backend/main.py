@@ -1,3 +1,5 @@
+# Copyright (c) 2025 Veekshith Gullapudi. All rights reserved.
+
 from fastapi import FastAPI, HTTPException, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
@@ -42,26 +44,35 @@ class GenerateRequest(BaseModel):
 
 @app.get("/")
 def read_root():
+    """
+    Root endpoint to verify if the API is running.
+    """
     return {"message": "Resume Generator API is running"}
 
 @app.post("/validate-url")
 def validate_and_scrape(request: UrlRequest, db: Session = Depends(get_db)):
+    """
+    Validates a job URL and scrapes the job description.
+    Stores the scraped job post in the database if it doesn't already exist.
+    Returns the job ID and a preview of the description.
+    """
     if not validate_url(request.url):
         return {"valid": False, "message": "Please enter valid URL"}
     
-    # Check if URL already exists
+    # Check if URL already exists in the database
     existing_job = db.query(JobPost).filter(JobPost.url == request.url).first()
     
-    # Scrape the job description
+    # Scrape the job description from the validated URL
     description = scrape_job_description(request.url)
     
     if existing_job:
+        # Update existing job description if found
         existing_job.description = description
         db.commit()
         db.refresh(existing_job)
         job_post = existing_job
     else:
-        # Save to DB
+        # Save new job post to DB
         job_post = JobPost(url=request.url, description=description)
         db.add(job_post)
         db.commit()
@@ -79,17 +90,23 @@ def validate_and_scrape(request: UrlRequest, db: Session = Depends(get_db)):
 
 @app.post("/upload-resume")
 async def upload_resume(file: UploadFile = File(...), db: Session = Depends(get_db)):
+    """
+    Handles resume file upload.
+    Saves the file locally, parses its content, and stores the metadata in the database.
+    Supported formats: PDF, DOCX.
+    """
     upload_dir = "backend/uploads"
     os.makedirs(upload_dir, exist_ok=True)
     file_path = os.path.join(upload_dir, file.filename)
     
+    # Save the uploaded file to disk
     with open(file_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
         
-    # Parse the resume
+    # Parse the resume content (extract text)
     parsed_content = parse_resume(file_path)
     
-    # Save to DB
+    # Save resume record to DB
     resume = Resume(filename=file.filename, content=parsed_content, original_path=file_path)
     db.add(resume)
     db.commit()
@@ -105,6 +122,11 @@ async def upload_resume(file: UploadFile = File(...), db: Session = Depends(get_
 
 @app.post("/generate-resume")
 def generate_resume(request: GenerateRequest, db: Session = Depends(get_db)):
+    """
+    Generates a tailored resume based on a specific job post and resume.
+    Uses AI to rewrite the resume content to match the job description.
+    Returns the download URL for the generated resume.
+    """
     job_post = db.query(JobPost).filter(JobPost.id == request.job_id).first()
     resume = db.query(Resume).filter(Resume.id == request.resume_id).first()
     
@@ -116,6 +138,7 @@ def generate_resume(request: GenerateRequest, db: Session = Depends(get_db)):
     filename = f"tailored_resume_{request.job_id}_{request.resume_id}.docx"
     output_path = os.path.join(output_dir, filename)
     
+    # Call the logic to generate the tailored resume
     _, status_message, company_name = generate_tailored_resume(resume.content, job_post.description, output_path, request.api_key)
     
     # Construct new filename if company name likely found
@@ -126,7 +149,7 @@ def generate_resume(request: GenerateRequest, db: Session = Depends(get_db)):
         final_filename = f"{original_basename}_{company_name}.docx"
         new_output_path = os.path.join(output_dir, final_filename)
         
-        # Rename file
+        # Rename file to the new custom name
         if os.path.exists(output_path):
             os.rename(output_path, new_output_path)
         
@@ -137,6 +160,10 @@ def generate_resume(request: GenerateRequest, db: Session = Depends(get_db)):
 
 @app.get("/download-resume/{filename}")
 def download_resume(filename: str):
+    """
+    Serves the generated resume file for download.
+    Checks if the file exists in the generated directory.
+    """
     file_path = os.path.join("backend/generated", filename)
     if not os.path.exists(file_path):
         raise HTTPException(status_code=404, detail="File not found")

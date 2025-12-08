@@ -1,8 +1,14 @@
+# Copyright (c) 2025 Veekshith Gullapudi. All rights reserved.
+
 import os
 from pypdf import PdfReader
 from docx import Document
 
 def extract_text_from_pdf(file_path: str) -> str:
+    """
+    Extracts text content from a PDF file.
+    Iterates through all pages and concatenates the text.
+    """
     try:
         reader = PdfReader(file_path)
         text = ""
@@ -14,6 +20,10 @@ def extract_text_from_pdf(file_path: str) -> str:
         return ""
 
 def extract_text_from_docx(file_path: str) -> str:
+    """
+    Extracts text content from a DOCX file.
+    Iterates through all paragraphs and concatenates the text.
+    """
     try:
         doc = Document(file_path)
         text = "\n".join([paragraph.text for paragraph in doc.paragraphs])
@@ -24,7 +34,8 @@ def extract_text_from_docx(file_path: str) -> str:
 
 def parse_resume(file_path: str) -> str:
     """
-    Parses the resume file and extracts text.
+    Main parser function that determines file type and calls the appropriate extractor.
+    Supports .pdf and .docx extensions.
     """
     _, ext = os.path.splitext(file_path)
     ext = ext.lower()

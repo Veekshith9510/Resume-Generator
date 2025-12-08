@@ -1,3 +1,5 @@
+# Copyright (c) 2025 Veekshith Gullapudi. All rights reserved.
+
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
@@ -12,6 +14,10 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
 def get_db():
+    """
+    Dependency generator for database sessions.
+    Yields a database session and ensures it's closed after use.
+    """
     db = SessionLocal()
     try:
         yield db

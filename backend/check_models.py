@@ -1,5 +1,10 @@
+# Copyright (c) 2025 Veekshith Gullapudi. All rights reserved.
+
 import google.generativeai as genai
 import sys
+
+# Script to check available Gemini models for the provided API key.
+# Usage: python check_models.py <API_KEY>
 
 # Pass API key as argument
 try:

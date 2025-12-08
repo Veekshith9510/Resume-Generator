@@ -1,8 +1,15 @@
+# Copyright (c) 2025 Veekshith Gullapudi. All rights reserved.
+
 import os
 import google.generativeai as genai
 
 class ResumeCopilot:
     def __init__(self, api_key: str = None):
+        """
+        Initializes the ResumeCopilot with an API key.
+        Checks for the API key in the environment variables if not provided directly.
+        Configures the Gemini generative AI model.
+        """
         # Prefer environment variable if not passed directly
         self.api_key = api_key or os.getenv("GEMINI_API_KEY")
         if self.api_key:
@@ -62,12 +69,14 @@ class ResumeCopilot:
             )
             return response.text
         except Exception as e:
+            # Handle potential errors during AI generation to prevent crash
             print(f"Copilot Error: {e}")
             return original_text + f"\n\n[AI ENHANCEMENT FAILED: {str(e)}]"
 
     def extract_company_name(self, job_description: str) -> str:
         """
-        Extracts the company name from the job description.
+        Extracts the company name from the job description using the AI model.
+        Returns "Company" if the extraction fails or the API key is missing.
         """
         if not self.model:
             return "Company"

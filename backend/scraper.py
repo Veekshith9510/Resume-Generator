@@ -1,10 +1,13 @@
+# Copyright (c) 2025 Veekshith Gullapudi. All rights reserved.
+
 import requests
 from bs4 import BeautifulSoup
 import re
 
 def validate_url(url: str) -> bool:
     """
-    Validates if the URL is from LinkedIn or Monster.
+    Validates if the provided URL is a supported job posting link.
+    Currently supports LinkedIn and Monster URLs.
     """
     linkedin_pattern = r"https?://(www\.)?linkedin\.com/.*"
     monster_pattern = r"https?://(www\.)?monster\.com/.*"
@@ -15,7 +18,9 @@ def validate_url(url: str) -> bool:
 
 def scrape_job_description(url: str) -> str:
     """
-    Scrapes the job description from the given URL.
+    Scrapes the text content of the job description from the given URL.
+    Uses a browser-like User-Agent to avoid basic bot detection.
+    Extracts all text from the page body and truncates it to 5000 chars.
     """
     try:
         headers = {

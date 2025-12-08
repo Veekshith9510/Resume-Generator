@@ -1,11 +1,16 @@
+# Copyright (c) 2025 Veekshith Gullapudi. All rights reserved.
+
 from docx import Document
 import os
 from .copilot import ResumeCopilot
 
 def generate_tailored_resume(original_content: str, job_description: str, output_path: str, api_key: str = None) -> tuple[str, str, str]:
     """
-    Generates a tailored resume based on the original content and job description.
-    Saves the result to output_path.
+    Orchestrates the resume generation process:
+    1. Uses AI (Copilot) to enhance the resume content based on the job description.
+    2. Extracts the company name from the job description for file naming.
+    3. Formats the enhanced content into a new DOCX file using Markdown-style parsing.
+    4. Saves the generated file to the specified path.
     """
     try:
         # AI Enhancement

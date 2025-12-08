@@ -1,3 +1,5 @@
+// Copyright (c) 2025 Veekshith Gullapudi. All rights reserved.
+
 import { useState, useEffect } from 'react';
 import mammoth from 'mammoth';
 import './ResumePreview.css';
@@ -6,6 +8,10 @@ function ResumePreview({ fileUrl }) {
     const [htmlContent, setHtmlContent] = useState('');
     const [error, setError] = useState('');
 
+    /**
+     * Effect hook to fetch and parse the DOCX file when fileUrl changes.
+     * Uses mammoth to convert DOCX ArrayBuffer to HTML.
+     */
     useEffect(() => {
         const fetchAndParse = async () => {
             if (!fileUrl) return;
