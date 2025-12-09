@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import './App.css';
+
 import { validateUrl, uploadResume, generateResume, getDownloadUrl } from './api';
 import ResumePreview from './ResumePreview';
 
@@ -98,6 +99,7 @@ function App() {
         <span>Welcome Veekshith</span>
       </div>
       <header>
+
         <h1>Resume Generator</h1>
       </header>
 

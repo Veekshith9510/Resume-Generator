@@ -70,6 +70,17 @@ body {
   }
 }
 
+.app-logo {
+  height: 60px;
+  width: auto;
+  margin-bottom: 1rem;
+  transition: transform 0.3s ease;
+}
+
+.app-logo:hover {
+  transform: rotate(5deg) scale(1.05);
+}
+
 header h1 {
   font-size: 4em;
   font-weight: 800;
