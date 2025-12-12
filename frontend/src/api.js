@@ -2,7 +2,7 @@
 
 import axios from 'axios';
 
-const API_URL = 'http://127.0.0.1:8000';
+const API_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
 
 /**
  * Validates the provided job URL.
@@ -65,9 +65,12 @@ export const generateResume = async (jobId, resumeId, apiKey = null) => {
 
 /**
  * Constructs the full download URL for a file.
- * @param {string} path - The relative path returned by the API.
+ * @param {string} path - The relative path returned by the API or full URL.
  * @returns {string} - The absolute URL.
  */
 export const getDownloadUrl = (path) => {
+    if (path.startsWith('http')) {
+        return path;
+    }
     return `${API_URL}${path}`;
 };

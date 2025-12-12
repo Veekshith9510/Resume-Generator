@@ -1,0 +1,10 @@
+fastapi
+uvicorn
+python-multipart
+mangum
+boto3
+google-generativeai
+beautifulsoup4
+requests
+python-docx
+pypdf
