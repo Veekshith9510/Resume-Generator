@@ -2,7 +2,12 @@
 
 from docx import Document
 import os
-from .copilot import ResumeCopilot
+
+# Support both Lambda (relative) and local dev (absolute) imports
+try:
+    from .copilot import ResumeCopilot
+except ImportError:
+    from copilot import ResumeCopilot
 
 def generate_tailored_resume(original_content: str, job_description: str, output_path: str, api_key: str = None) -> tuple[str, str, str]:
     """

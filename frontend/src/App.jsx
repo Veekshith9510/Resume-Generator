@@ -1,5 +1,3 @@
-// Copyright (c) 2025 Veekshith Gullapudi. All rights reserved.
-
 import { useState } from 'react';
 import './App.css';
 
@@ -27,20 +25,26 @@ function App() {
     setMessage('Analyzing URL...');
     setStatus('analyzing');
 
-    const result = await validateUrl(url);
-    setIsLoading(false);
+    try {
+      const result = await validateUrl(url);
 
-    if (result.valid) {
-      setStatus('valid');
-      setMessage(result.message);
-      setJobId(result.data.job_id);
-      // Wait briefly before prompting for resume upload
-      setTimeout(() => {
-        setMessage("The Process has analyzed the Job Description, Upload a Resume to generate a new resume");
-      }, 1500);
-    } else {
+      if (result.valid) {
+        setStatus('valid');
+        setMessage(result.message);
+        setJobId(result.data.job_id);
+        // Wait briefly before prompting for resume upload
+        setTimeout(() => {
+          setMessage("The Process has analyzed the Job Description, Upload a Resume to generate a new resume");
+        }, 1500);
+      } else {
+        setStatus('invalid');
+        setMessage(result.message || 'Invalid Job URL');
+      }
+    } catch (error) {
       setStatus('invalid');
-      setMessage(result.message);
+      setMessage('Error validating URL');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -54,14 +58,25 @@ function App() {
 
     setIsLoading(true);
     setMessage('Uploading resume...');
+    setStatus('uploading');
 
     try {
       const result = await uploadResume(file);
-      setResumeId(result.data.resume_id);
-      setStatus('uploaded');
-      setMessage(result.message);
+      // Check if result has date.resume_id or direct property depending on api.js implementation
+      // Assuming result.data.resume_id based on previous code usage
+      const id = result.data ? result.data.resume_id : result.resume_id;
+
+      if (id) {
+        setResumeId(id);
+        setStatus('uploaded');
+        setMessage(result.message || 'Resume uploaded successfully');
+      } else {
+        throw new Error('No resume ID returned');
+      }
     } catch (error) {
+      console.error(error);
       setMessage('Error uploading resume');
+      setStatus('valid'); // Revert to valid so user can try again
     } finally {
       setIsLoading(false);
     }
@@ -80,14 +95,22 @@ function App() {
     setStatus('generating');
 
     try {
-      const result = await generateResume(jobId, resumeId, apiKey);
-      const fileUrl = getDownloadUrl(result.download_url);
-      setDownloadLink(fileUrl);
-      setPreviewUrl(fileUrl); // Set content for preview
-      setStatus('generated');
-      setMessage(result.message);
+      const result = await generateResume(resumeId, jobId, apiKey);
+
+      if (result.download_url) {
+        setDownloadLink(getDownloadUrl(result.download_url));
+        setStatus('generated');
+        setMessage('Resume generated successfully!');
+        if (result.preview_content) {
+          setPreviewUrl(result.preview_content);
+        }
+      } else {
+        throw new Error('No download URL returned');
+      }
     } catch (error) {
+      console.error(error);
       setMessage('Error generating resume');
+      setStatus('uploaded'); // Allow retry
     } finally {
       setIsLoading(false);
     }
@@ -95,68 +118,65 @@ function App() {
 
   return (
     <div className="app-container">
-      <div className="scrolling-welcome">
-        <span>Welcome Veekshith</span>
-      </div>
-      <header>
-
-        <h1>Resume Generator</h1>
+      <header className="app-header">
+        <h1>AI Resume Generator</h1>
+        <p>Tailor your resume to any job description in seconds.</p>
       </header>
 
-      <main className="dashboard">
-        <div className="card">
-          <div className="input-group">
+      <main className="main-content">
+        <div className="input-section">
+          <input
+            type="text"
+            placeholder="Paste Job URL (LinkedIn/Monster)"
+            value={url}
+            onChange={(e) => setUrl(e.target.value)}
+            disabled={isLoading || status === 'analyzing'}
+            className="url-input"
+          />
+          <button
+            onClick={handleUrlSubmit}
+            disabled={!url || isLoading || status === 'analyzing'}
+            className="submit-btn"
+          >
+            Analyze Job
+          </button>
+        </div>
+
+        {isLoading && <div className="status-message analyzing">Processing...</div>}
+        {!isLoading && message && <div className={`status-message ${status}`}>{message}</div>}
+
+        {status === 'valid' && (
+          <div className="action-section fade-in">
+            <label className="upload-btn">
+              Upload Resume
+              <input type="file" onChange={handleFileUpload} accept=".pdf,.docx" hidden />
+            </label>
+          </div>
+        )}
+
+        {status === 'uploaded' && (
+          <div className="action-section fade-in">
             <input
-              type="text"
-              placeholder="Paste LinkedIn or Monster Job URL"
-              value={url}
-              onChange={(e) => setUrl(e.target.value)}
-              disabled={status === 'valid' || status === 'uploaded' || status === 'generated'}
+              type="password"
+              placeholder="Optional: Enter Gemini/OpenAI API Key for Copilot"
+              value={apiKey}
+              onChange={(e) => setApiKey(e.target.value)}
+              className="api-key-input"
             />
-            <button
-              onClick={handleUrlSubmit}
-              disabled={isLoading || !url || status === 'valid' || status === 'uploaded' || status === 'generated'}
-            >
-              Enter
+            <button className="generate-btn" onClick={handleGenerate} disabled={isLoading}>
+              Generate Resume
             </button>
           </div>
+        )}
 
-          {isLoading && <div className="status-message analyzing">Processing...</div>}
-          {!isLoading && message && <div className={`status-message ${status}`}>{message}</div>}
-
-          {status === 'valid' && (
-            <div className="action-section fade-in">
-              <label className="upload-btn">
-                Upload Resume
-                <input type="file" onChange={handleFileUpload} accept=".pdf,.docx" hidden />
-              </label>
-            </div>
-          )}
-
-          {status === 'uploaded' && (
-            <div className="action-section fade-in">
-              <input
-                type="password"
-                placeholder="Optional: Enter Gemini/OpenAI API Key for Copilot"
-                value={apiKey}
-                onChange={(e) => setApiKey(e.target.value)}
-                className="api-key-input"
-              />
-              <button className="generate-btn" onClick={handleGenerate} disabled={isLoading}>
-                Generate Resume
-              </button>
-            </div>
-          )}
-
-          {status === 'generated' && (
-            <div className="action-section fade-in">
-              <a href={downloadLink} className="download-btn" target="_blank" rel="noopener noreferrer">
-                Download Resume
-              </a>
-              {previewUrl && <ResumePreview fileUrl={previewUrl} />}
-            </div>
-          )}
-        </div>
+        {status === 'generated' && (
+          <div className="action-section fade-in">
+            <a href={downloadLink} className="download-btn" target="_blank" rel="noopener noreferrer">
+              Download Resume
+            </a>
+            {previewUrl && <ResumePreview fileUrl={previewUrl} />}
+          </div>
+        )}
       </main>
     </div>
   );

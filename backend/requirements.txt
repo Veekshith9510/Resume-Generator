@@ -8,3 +8,4 @@ beautifulsoup4
 requests
 python-docx
 pypdf
+sqlalchemy

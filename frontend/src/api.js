@@ -41,27 +41,25 @@ export const uploadResume = async (file) => {
     }
 };
 
-/**
- * Requests the server to generate a tailored resume.
- * @param {number} jobId - The ID of the job post.
- * @param {number} resumeId - The ID of the uploaded resume.
- * @param {string} [apiKey] - Optional Gemini API Key.
- * @returns {Promise<Object>} - The API response containing the download URL.
- */
-export const generateResume = async (jobId, resumeId, apiKey = null) => {
-    try {
-        const response = await axios.post(`${API_URL}/generate-resume`, {
-            job_id: jobId,
-            resume_id: resumeId,
-            api_key: apiKey
-        });
-        return response.data;
-    } catch (error) {
-        console.error("Error generating resume:", error);
-        throw error;
-    }
-};
 
+export async function generateResume(resumeId, jobId, apiKey = null) {
+    const response = await fetch(`${API_URL}/generate-resume`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            resume_id: resumeId,
+            job_id: jobId,
+            api_key: apiKey
+        }),
+    });
+
+    if (!response.ok) {
+        throw new Error('Failed to start generation');
+    }
+    return response.json(); // { message: "...", download_url: "..." }
+}
 
 /**
  * Constructs the full download URL for a file.
