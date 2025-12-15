@@ -71,15 +71,11 @@ resource "aws_s3_bucket_policy" "frontend_bucket_policy" {
 # Bucket for Resumes (Uploads & Generated)
 resource "aws_s3_bucket" "resume_bucket" {
   bucket = "${var.project_name}-files-v9510"
-}
-
-resource "aws_s3_bucket_cors" "resume_bucket_cors" {
-  bucket = aws_s3_bucket.resume_bucket.id
 
   cors_rule {
     allowed_headers = ["*"]
     allowed_methods = ["PUT", "GET", "POST", "HEAD"]
-    allowed_origins = ["*"] # In production, restrict this to CloudFront domain
+    allowed_origins = ["*"] 
     expose_headers  = ["ETag"]
     max_age_seconds = 3000
   }
