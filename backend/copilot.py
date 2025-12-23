@@ -2,6 +2,7 @@
 
 import os
 import google.generativeai as genai
+import json
 
 class ResumeCopilot:
     def __init__(self, api_key: str = None):
@@ -20,81 +21,84 @@ class ResumeCopilot:
 
     def enhance_content(self, original_text: str, job_description: str) -> str:
         """
-        Enhances the resume content based on the job description.
+        DEPRECATED: Use optimize_bullet_points instead.
+        """
+        return f"[DEPRECATED] Content enhancement skipped."
+
+    def optimize_all_content(self, summary_text: str, experience_entries: list[dict], job_description: str) -> dict:
+        """
+        Batches all resume components into a SINGLE AI request to avoid rate limits.
         """
         if not self.model:
-            # Fallback if no API key is present
-            return f"{original_text}\n\n[AI ENHANCEMENT SKIPPED: Missing API Key]\n\n"
+            return None
+
+        print(f"DEBUG: Optimization Request - JD Length: {len(job_description)}")
+        print(f"DEBUG: JD Preview: {job_description[:200]}...")
+
+        # Prepare a structured payload for the AI
+        payload = {
+            "summary": summary_text,
+            "entries": [{"id": i, "header": e["header"], "bullets": e["bullets"]} for i, e in enumerate(experience_entries)]
+        }
 
         prompt = f"""
-        You are an expert resume writer. I will provide you with my original resume content and a job description.
-        Your task is to rewrite the candidate's resume to specifically target the Job Description provided.
-        
-        Tailoring Instructions (CRITICAL):
-        1. **Job Title Analysis**: Identify the Job Title and Company from the Job Description.
-        2. **Professional Summary**: Rewrite the Professional Summary (or Objective) to explicitly mention the targeted Job Title and Company, and highlight 2-3 key achievements that fit this specific role.
-        3. **Experience Enhancements**:
-            - Keep the Company Name, Job Title, and Dates exactly as in the original resume.
-            - **Rewrite the bullet points** for each role to emphasize skills and achievements that are most relevant to this specific Job Description.
-            - Use specific keywords and terminology from the Job Description in the bullet points.
-            - If a bullet point is completely irrelevant to the new role, remove it or deprioritize it.
-            - ensuring the meaning doesn't change
-        4. **Skills**: Add relevant technical or soft skills found in the Job Description (if the candidate's background supports them) and prioritize them.
-        
-        IMPORTANT FORMATTING INSTRUCTIONS:
-        1. Keep the resume in the same format as the original resume (headers, order).
-        2. Use Markdown headers (#, ##) for section titles.
-        3. Use bullet points (-) for list items.
-        4. Use **bold** for emphasis on key skills or metrics.
-        5. Do NOT use asterisks (*) for bullet points, use hyphens (-).
-        6. Do NOT use code blocks.
-        7. Keep the layout professional and clean.
-        8. Keep the Education section as is.
+        You are a top-tier resume architect. 
         
         Job Description:
         {job_description}
-        
-        Original Resume:
-        {original_text}
-        
-        Please provide the full rewritten resume content in clean Markdown.
-        """
 
+        Current Resume Content (JSON):
+        {json.dumps(payload, indent=2)}
+
+        Task: 
+        1. Identify the hiring company from the Job Description.
+        2. Optimize the "summary" to be a high-impact, 3-4 sentence professional summary targeted at the JD.
+        3. For EACH experience entry:
+           - Optimize the existing bullets for impact and relevance.
+           - ADD 2-3 NEW high-impact bullets that align the candidate's background with the JD (e.g. ServiceNow, Cloud, leadership).
+           - ENSURE all bullets are SHORT, CRISP, and TO THE POINT.
+        4. Make sure the resume is optimized for the hiring company.
+        5. The new bullet points should be relevant to the job description.
+        6. The new Bullet points shoud be Quantifiable Metrics, Architectural Decision-Making, Cross-Functional Leadership, Business Alignment
+        7. Once the new bullet points are generated, cross check with the existing bullet points and remove any duplicates.
+        STRICT RULES:
+        - Return ONLY a JSON object with keys: "company_name" (string), "summary" (string) and "entries" (list of objects with "id" and "optimized_bullets" list).
+        - Each bullet MUST be a single line.
+        - DO NOT HALLUCINATE brand new jobs.
+        - Preserve dates and company names.
+        
+        Output format:
+        {{
+          "company_name": "...",
+          "summary": "...",
+          "entries": [
+            {{ "id": 0, "optimized_bullets": ["...", "...", "..."] }},
+            ...
+          ]
+        }}
+        """
+        
         try:
-            response = self.model.generate_content(
-                prompt,
-                generation_config=genai.types.GenerationConfig(
-                    max_output_tokens=8192
-                )
-            )
-            return response.text
+            response = self.model.generate_content(prompt)
+            clean_text = response.text.strip().replace('```json', '').replace('```', '').strip()
+            result = json.loads(clean_text)
+            return result
         except Exception as e:
-            # Handle potential errors during AI generation to prevent crash
-            print(f"Copilot Error: {e}")
-            return original_text + f"\n\n[AI ENHANCEMENT FAILED: {str(e)}]"
+            print(f"DEBUG: AI Batch Error - {e}")
+            return None
 
     def extract_company_name(self, job_description: str) -> str:
         """
-        Extracts the company name from the job description using the AI model.
-        Returns "Company" if the extraction fails or the API key is missing.
+        Extracts the company name from the job description.
         """
-        if not self.model:
+        if not self.model or not job_description:
             return "Company"
 
-        prompt = f"""
-        Identify the company name from the following job description. 
-        Return ONLY the company name. If not found, return "Company".
-        Do not include any other text or punctuation.
-        
-        Job Description:
-        {job_description}
-        """
-
+        prompt = f"Extract only the company name from this job description. If not found, return 'Company'.\n\nJob Description:\n{job_description}"
         try:
             response = self.model.generate_content(prompt)
-            company_name = response.text.strip()
-            # Basic cleanup to ensure filename safety
-            safe_name = "".join(c for c in company_name if c.isalnum() or c in (' ', '_', '-')).strip()
+            name = response.text.strip()
+            safe_name = "".join(c for c in name if c.isalnum() or c in (' ', '_', '-')).strip()
             return safe_name.replace(' ', '_')
-        except Exception:
+        except:
             return "Company"

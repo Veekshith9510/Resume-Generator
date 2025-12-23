@@ -42,7 +42,25 @@ export const uploadResume = async (file) => {
 };
 
 
-export async function generateResume(resumeId, jobId, apiKey = null) {
+export const previewOptimization = async (resumeId, jobId, apiKey = null) => {
+    try {
+        const response = await axios.post(`${API_URL}/preview-optimization`, {
+            resume_id: resumeId,
+            job_id: jobId,
+            api_key: apiKey
+        });
+        return response.data;
+    } catch (error) {
+        console.error("Error fetching preview:", error);
+        if (error.response && error.response.data) {
+            // Throw the actual server error message if available
+            throw new Error(error.response.data.detail || error.response.data.message || "Server Error");
+        }
+        throw error;
+    }
+};
+
+export async function generateResume(resumeId, jobId, apiKey = null, approvedPlan = null) {
     const response = await fetch(`${API_URL}/generate-resume`, {
         method: 'POST',
         headers: {
@@ -51,7 +69,8 @@ export async function generateResume(resumeId, jobId, apiKey = null) {
         body: JSON.stringify({
             resume_id: resumeId,
             job_id: jobId,
-            api_key: apiKey
+            api_key: apiKey,
+            approved_plan: approvedPlan
         }),
     });
 

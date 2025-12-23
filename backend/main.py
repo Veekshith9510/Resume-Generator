@@ -8,7 +8,7 @@ from .database import engine, Base
 from .models import Base, JobPost, Resume
 from .scraper import validate_url, scrape_job_description
 from .resume_parser import parse_resume
-from .resume_generator import generate_tailored_resume
+from .resume_generator import generate_tailored_resume, get_optimization_plan
 from sqlalchemy.orm import Session
 from fastapi import Depends
 from .database import get_db
@@ -37,10 +37,16 @@ app.add_middleware(
 class UrlRequest(BaseModel):
     url: str
 
+class PreviewRequest(BaseModel):
+    job_id: int
+    resume_id: int
+    api_key: str = None
+
 class GenerateRequest(BaseModel):
     job_id: int
     resume_id: int
     api_key: str = None
+    approved_plan: dict = None
 
 @app.get("/")
 def read_root():
@@ -120,6 +126,20 @@ async def upload_resume(file: UploadFile = File(...), db: Session = Depends(get_
         }
     }
 
+@app.post("/preview-optimization")
+def preview_optimization(request: PreviewRequest, db: Session = Depends(get_db)):
+    """
+    Returns a plan showing how the resume will be optimized.
+    """
+    job_post = db.query(JobPost).filter(JobPost.id == request.job_id).first()
+    resume = db.query(Resume).filter(Resume.id == request.resume_id).first()
+    
+    if not job_post or not resume:
+        raise HTTPException(status_code=404, detail="Job Post or Resume not found")
+        
+    plan = get_optimization_plan(resume.original_path, job_post.description, request.api_key)
+    return plan
+
 @app.post("/generate-resume")
 def generate_resume(request: GenerateRequest, db: Session = Depends(get_db)):
     """
@@ -135,23 +155,36 @@ def generate_resume(request: GenerateRequest, db: Session = Depends(get_db)):
     
     output_dir = "backend/generated"
     os.makedirs(output_dir, exist_ok=True)
+    # Temporary filename
     filename = f"tailored_resume_{request.job_id}_{request.resume_id}.docx"
     output_path = os.path.join(output_dir, filename)
     
     # Call the logic to generate the tailored resume
-    _, status_message, company_name = generate_tailored_resume(resume.content, job_post.description, output_path, request.api_key)
+    _, status_message, company_name = generate_tailored_resume(
+        resume.original_path, 
+        job_post.description, 
+        output_path, 
+        request.api_key,
+        approved_plan=request.approved_plan
+    )
     
-    # Construct new filename if company name likely found
-    final_filename = filename
+    # Construct new filename
+    # Format: OriginalName_Optimized_CompanyName.docx
+    original_basename = os.path.splitext(resume.filename)[0]
+    
+    clean_company_name = "Company"
     if company_name and company_name.lower() != "company":
-        # Format: OriginalName_CompanyName.docx
-        original_basename = os.path.splitext(resume.filename)[0]
-        final_filename = f"{original_basename}_{company_name}.docx"
-        new_output_path = os.path.join(output_dir, final_filename)
-        
-        # Rename file to the new custom name
-        if os.path.exists(output_path):
-            os.rename(output_path, new_output_path)
+         clean_company_name = company_name
+
+    final_filename = f"{original_basename}_Optimized_{clean_company_name}.docx"
+    new_output_path = os.path.join(output_dir, final_filename)
+    
+    # Rename file to the new custom name
+    if os.path.exists(output_path):
+        # If the target file already exists (duplicate request), overwrite logic or just replace
+        if os.path.exists(new_output_path):
+            os.remove(new_output_path)
+        os.rename(output_path, new_output_path)
         
     return {
         "message": status_message,

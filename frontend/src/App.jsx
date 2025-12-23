@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import './App.css';
 
-import { validateUrl, uploadResume, generateResume, getDownloadUrl } from './api';
+import { validateUrl, uploadResume, generateResume, getDownloadUrl, previewOptimization } from './api';
 import ResumePreview from './ResumePreview';
+import OptimizationReview from './OptimizationReview';
 
 function App() {
   const [url, setUrl] = useState('');
@@ -14,6 +15,8 @@ function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [apiKey, setApiKey] = useState(''); // New state for API Key
   const [previewUrl, setPreviewUrl] = useState(''); // New state for Preview URL
+  const [optimizationPlan, setOptimizationPlan] = useState(null); // New state for the plan
+
 
   /**
    * Handles the Job URL submission.
@@ -83,34 +86,52 @@ function App() {
   };
 
   /**
-   * Triggers the resume generation process.
-   * Sends Job ID, Resume ID, and API Key to backend.
-   * Updates state with download link and preview content.
+   * Fetches the optimization plan from the AI.
    */
-  const handleGenerate = async () => {
+  const handlePreview = async () => {
+    if (!jobId || !resumeId) return;
+    setIsLoading(true);
+    setMessage('AI is analyzing your experience and job requirements...');
+    setStatus('previewing');
+
+    try {
+      const plan = await previewOptimization(resumeId, jobId, apiKey);
+      setOptimizationPlan(plan);
+      setStatus('reviewing');
+      setMessage('Optimization plan ready for review.');
+    } catch (error) {
+      console.error(error);
+      setMessage(error.message || 'Error fetching optimization plan');
+      setStatus('uploaded');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  /**
+   * Triggers the final resume generation process with the approved plan.
+   */
+  const handleGenerate = async (approvedPlan = null) => {
     if (!jobId || !resumeId) return;
 
     setIsLoading(true);
-    setMessage('Generating resume with Copilot...');
+    setMessage('Generating final tailored resume...');
     setStatus('generating');
 
     try {
-      const result = await generateResume(resumeId, jobId, apiKey);
+      const result = await generateResume(resumeId, jobId, apiKey, approvedPlan || optimizationPlan);
 
       if (result.download_url) {
         setDownloadLink(getDownloadUrl(result.download_url));
         setStatus('generated');
         setMessage('Resume generated successfully!');
-        if (result.preview_content) {
-          setPreviewUrl(result.preview_content);
-        }
       } else {
         throw new Error('No download URL returned');
       }
     } catch (error) {
       console.error(error);
       setMessage('Error generating resume');
-      setStatus('uploaded'); // Allow retry
+      setStatus('reviewing');
     } finally {
       setIsLoading(false);
     }
@@ -158,15 +179,23 @@ function App() {
           <div className="action-section fade-in">
             <input
               type="password"
-              placeholder="Optional: Enter Gemini/OpenAI API Key for Copilot"
+              placeholder="Optional: Enter Gemini API Key"
               value={apiKey}
               onChange={(e) => setApiKey(e.target.value)}
               className="api-key-input"
             />
-            <button className="generate-btn" onClick={handleGenerate} disabled={isLoading}>
-              Generate Resume
+            <button className="generate-btn" onClick={handlePreview} disabled={isLoading}>
+              Analyze & Preview
             </button>
           </div>
+        )}
+
+        {status === 'reviewing' && optimizationPlan && (
+          <OptimizationReview
+            plan={optimizationPlan}
+            onApprove={handleGenerate}
+            onCancel={() => setStatus('uploaded')}
+          />
         )}
 
         {status === 'generated' && (
