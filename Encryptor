@@ -1,0 +1,153 @@
+package com.sg.newedge.risk.batchPilot.util;
+
+import com.sg.newedge.risk.batchPilot.exception.BatchPilotException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import javax.crypto.*;
+import javax.crypto.spec.DESKeySpec;
+import javax.crypto.spec.IvParameterSpec;
+import java.io.UnsupportedEncodingException;
+import java.nio.charset.StandardCharsets;
+import java.security.InvalidAlgorithmParameterException;
+import java.security.InvalidKeyException;
+import java.security.NoSuchAlgorithmException;
+import java.security.spec.InvalidKeySpecException;
+
+public class Encryptor {
+    private static final Logger log = LoggerFactory.getLogger(Encryptor.class);
+    private static final String DEFAULT_KEY = "1234abcd";
+    private static final String KEY_ENVIRONMENT_VARIABLE = "BATCHPILOT_ENCRYPTION_KEY";
+
+    public static void main(final String[] args) throws Exception {
+
+        if (args.length != 3) {
+            System.out
+                    .println("USAGE - Encryption:  java com.ffm.tools.util.Encrypter -E "
+                            + "[String] Key");
+            System.out
+                    .println("USAGE - Decryption:  java com.ffm.tools.util.Encrypter -D "
+                            + "[String] Key");
+            System.exit(1);
+        }
+        final String option = args[0];
+        final String input = args[1];
+        final String key = args[2];
+        String output = null;
+
+        switch (option){
+            case "-E":
+                output = Encryptor.encrypt(input, key);
+                System.out.println("encrypted to:[" + output + "]");
+                break;
+            case "-D":
+                output = Encryptor.decrypt(input, key);
+                System.out.println("Decrypted to:[" + output + "]");
+                break;
+
+        }
+    }
+
+    public static String decrypt(final String message, final String key) throws BatchPilotException {
+        try {
+            final byte[] bytesrc = Encryptor.convertHexString(message);
+            final Cipher cipher = Cipher.getInstance("DES/CBC/PKCS5Padding");
+            final DESKeySpec desKeySpec = new DESKeySpec(key.getBytes("UTF-8"));
+            final SecretKeyFactory keyFactory = SecretKeyFactory.getInstance("DES");
+            final SecretKey secretKey = keyFactory.generateSecret(desKeySpec);
+            final IvParameterSpec iv = new IvParameterSpec(key.getBytes("UTF-8"));
+            cipher.init(Cipher.DECRYPT_MODE, secretKey, iv);
+            final byte[] retByte = cipher.doFinal(bytesrc);
+            return new String(retByte);
+        } catch (final NoSuchAlgorithmException | NoSuchPaddingException | InvalidKeyException | IllegalBlockSizeException |
+                InvalidAlgorithmParameterException | UnsupportedEncodingException | BadPaddingException |
+                InvalidKeySpecException e) {
+            Encryptor.log.error("error in decrypt-1",e);
+            throw new BatchPilotException("DecryptionException", "Encryptor", "decrypt", e.getMessage());
+        }
+    }
+
+    public static String encrypt(final String message, final String key) throws BatchPilotException {
+        try {
+            final Cipher cipher = Cipher.getInstance("DES/CBC/PKCS5Padding");
+            final DESKeySpec desKeySpec = new DESKeySpec(key.getBytes("UTF-8"));
+            final SecretKeyFactory keyFactory = SecretKeyFactory.getInstance("DES");
+            final SecretKey secretKey = keyFactory.generateSecret(desKeySpec);
+            final IvParameterSpec iv = new IvParameterSpec(key.getBytes("UTF-8"));
+            cipher.init(Cipher.ENCRYPT_MODE, secretKey, iv);
+            return Encryptor.toHexString(cipher.doFinal(message.getBytes("UTF-8")));
+        } catch (final NoSuchAlgorithmException | NoSuchPaddingException | InvalidKeyException | IllegalBlockSizeException |
+                InvalidAlgorithmParameterException | UnsupportedEncodingException | BadPaddingException |
+                InvalidKeySpecException e) {
+            Encryptor.log.error("error in decrypt-2",e);
+            throw new BatchPilotException("DecryptionException", "Encryptor", "decrypt", e.getMessage());
+        }
+
+    }
+
+
+    public static String decrypt(final String message) throws BatchPilotException {
+        return decrypt(message, resolveKey());
+    }
+
+    public static String encrypt(final String message) throws BatchPilotException {
+        return encrypt(message, resolveKey());
+    }
+
+    public static void validateEncryptionKey(final String encryptionKey) {
+        validateEncryptionKey(KEY_ENVIRONMENT_VARIABLE, encryptionKey);
+    }
+
+    public static void validateEncryptionKey(final String propertyName, final String encryptionKey) {
+        if (encryptionKey == null || encryptionKey.isBlank()
+                || encryptionKey.getBytes(StandardCharsets.UTF_8).length != 8) {
+            throw new IllegalStateException(propertyName
+                    + " must be supplied as a secret and contain exactly 8 UTF-8 bytes");
+        }
+    }
+
+    private static String resolveKey() {
+        final String encryptionKey = System.getenv(KEY_ENVIRONMENT_VARIABLE);
+        if (encryptionKey != null && !encryptionKey.isBlank()) {
+            validateEncryptionKey(encryptionKey);
+            return encryptionKey;
+        }
+        return DEFAULT_KEY;
+    }
+
+    public static String decrypt(final String value, final String prefix, final String suffix) throws BatchPilotException {
+        String output = null;
+        if (value.startsWith(prefix) && value.endsWith(suffix)) {
+            final String s = value.substring(4, value.length() - 1);
+            output = Encryptor.decrypt(s);
+        } else {
+            output = value;
+        }
+        return output;
+    }
+
+    private static byte[] convertHexString(final String ss) {
+        final byte[] digest = new byte[ss.length() / 2];
+        for (int i = 0; i < digest.length; i++) {
+            final String byteString = ss.substring(2 * i, 2 * i + 2);
+            final int byteValue = Integer.parseInt(byteString, 16);
+            digest[i] = (byte) byteValue;
+        }
+        return digest;
+    }
+
+    private static String toHexString(final byte[] b) {
+        final StringBuffer hexString = new StringBuffer();
+        for (int i = 0; i < b.length; i++) {
+            String plainText = Integer.toHexString(0xff & b[i]);
+            if (plainText.length() < 2) {
+                plainText = "0" + plainText;
+            }
+            hexString.append(plainText);
+        }
+        return hexString.toString();
+    }
+
+
+}
+
