@@ -1,0 +1,32 @@
+package com.sg.newedge.risk.batchPilot.dao.bean;
+
+
+import org.apache.commons.dbcp2.BasicDataSource;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import com.sg.newedge.risk.batchPilot.util.*;
+
+public class BatchPilotDataSource extends BasicDataSource {
+
+	static Logger _log = LoggerFactory.getLogger(BatchPilotDataSource.class.getName());
+
+	public BatchPilotDataSource() {
+	}
+
+	public void setPassword(String password) {
+		String decryptedPassword = password;
+		try {
+			decryptedPassword = Encryptor.decrypt(password);
+		} catch (Exception e) {
+			_log.error("failed to decrypt:" + password);
+		}
+		super.setPassword(decryptedPassword);
+	}
+
+    public java.util.logging.Logger getParentLogger() {
+
+        return java.util.logging.Logger.getLogger(java.util.logging.Logger.GLOBAL_LOGGER_NAME);
+    }
+
+
+}
