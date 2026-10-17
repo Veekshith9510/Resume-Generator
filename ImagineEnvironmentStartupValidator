@@ -1,0 +1,65 @@
+package com.sg.newedge.risk.batchPilot.startup;
+
+import com.sg.newedge.risk.batchPilot.exception.BatchPilotException;
+import com.sg.newedge.risk.batchPilot.web.service.client.impl.ImagineConfigurationValidator;
+import com.sg.newedge.risk.batchPilot.web.service.client.impl.ImagineExceptionClassifier;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.env.Environment;
+import org.springframework.stereotype.Component;
+
+import java.util.Arrays;
+import java.util.Locale;
+
+/**
+ * Validates all mandatory Imagine web service configuration at Spring context startup (fails
+ * fast with a clear message instead of failing later, mid-batch, with a confusing DNS/connection
+ * stack trace), and refuses to start when no explicit Spring profile is active while the
+ * configured Imagine endpoint looks like a production host. This is the guard against the
+ * historical UAT failure mode where the application silently ran with the default profile
+ * against api.prod.tsimagine.com.
+ * <p>
+ * Does not invent or hard-code a replacement URL: it only requires that whoever deploys the
+ * application makes the intent explicit (an environment profile + an environment-specific
+ * WEB_SERVICE_HOST).
+ */
+@Component
+public class ImagineEnvironmentStartupValidator {
+
+    private static final Logger log = LoggerFactory.getLogger(ImagineEnvironmentStartupValidator.class);
+
+    public ImagineEnvironmentStartupValidator(final Environment environment,
+                                              @Value("${WEB_SERVICE_HOST:}") final String webServiceHost,
+                                              @Value("${IMAGINE_DR_WEB_SERVICE_HOST:}") final String webServiceHostDr,
+                                              @Value("${RESTFUL_CONNECTION_TIMEOUT:0}") final int restfulConnectionTimeout,
+                                              @Value("${RESTFUL_READ_TIMEOUT:0}") final int restfulReadTimeout,
+                                              @Value("${IMGUSER_NAME:}") final String imagineUser,
+                                              @Value("${IMGPASSWORD:}") final String imaginePassword,
+                                              @Value("${imagine.environment.endofmonth.webservice.user:}") final String eomImagineUser,
+                                              @Value("${imagine.environment.endofmonth.webservice.password:}") final String eomImaginePassword) throws BatchPilotException {
+        ImagineConfigurationValidator.requireValidBaseUrl("WEB_SERVICE_HOST", webServiceHost);
+        ImagineConfigurationValidator.requireValidBaseUrl("IMAGINE_DR_WEB_SERVICE_HOST", webServiceHostDr);
+        ImagineConfigurationValidator.requirePositive("RESTFUL_CONNECTION_TIMEOUT", restfulConnectionTimeout);
+        ImagineConfigurationValidator.requirePositive("RESTFUL_READ_TIMEOUT", restfulReadTimeout);
+        ImagineConfigurationValidator.requireNotBlank("IMGUSER_NAME", imagineUser);
+        ImagineConfigurationValidator.requireNotBlank("IMGPASSWORD", imaginePassword);
+        ImagineConfigurationValidator.requireNotBlank("imagine.environment.endofmonth.webservice.user", eomImagineUser);
+        ImagineConfigurationValidator.requireNotBlank("imagine.environment.endofmonth.webservice.password", eomImaginePassword);
+
+        final String[] activeProfiles = environment.getActiveProfiles();
+        final boolean explicitProfileActive = activeProfiles.length > 0;
+        final String sanitizedHost = ImagineExceptionClassifier.sanitizeHost(webServiceHost);
+
+        log.info("BatchPilot starting: activeProfiles={}, imagineHost={}",
+                explicitProfileActive ? Arrays.toString(activeProfiles) : "default", sanitizedHost);
+
+        if (!explicitProfileActive && webServiceHost.toLowerCase(Locale.ROOT).contains("prod")) {
+            throw new IllegalStateException("Refusing to start with the default Spring profile while WEB_SERVICE_HOST "
+                    + "resolves to a production-looking host (" + sanitizedHost + "). Set spring.profiles.active to the "
+                    + "correct environment (e.g. -Dspring.profiles.active=uat) and confirm WEB_SERVICE_HOST is the "
+                    + "correct endpoint for that environment before starting BatchPilot.");
+        }
+    }
+}
+
